@@ -1,0 +1,9 @@
+[package]
+name = "zapf"
+version = "0.0.0"
+edition = "2018"
+description = "Client for the PILS PLC specification"
+repository = "https://github.com/birkenfeld/zapf-rs"
+license = "LGPL-3.0+"
+
+[dependencies]
