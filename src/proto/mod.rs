@@ -21,42 +21,34 @@
 //
 // *****************************************************************************
 
-pub mod io;
-pub mod proto;
+pub mod ads;
+pub mod modbus;
+pub mod tango;
 
-use thiserror::Error;
+use std::time::Duration;
 
+use crate::Result;
 
-#[derive(Debug, Error)]
-pub enum Error {
-    // address format specification error
-    #[error("invalid address, must be {0}")]
-    InvalidAddress(&'static str),
-    // general IO error
-    #[error(transparent)]
-    IO(#[from] std::io::Error),
+pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
+pub const READ_TIMEOUT: Duration = Duration::from_secs(1);
+pub const WRITE_TIMEOUT: Duration = Duration::from_secs(1);
 
-    // ADS specific error code
-    #[error("ADS error: {0} ({1})")]
-    ADS(&'static str, u32),
+pub trait Protocol {
+    fn connect(&mut self) -> Result<()>;
+    fn disconnect(&mut self);
+    fn reconnect(&mut self) -> Result<()> {
+        self.connect()
+    }
 
-    // Modbus specific error code
-    #[error("Modbus error: {0}")]
-    Modbus(#[from] modbus::Error),
+    fn read_into(&mut self, addr: usize, data: &mut [u8]) -> Result<()>;
+    fn write(&mut self, addr: usize, data: &[u8]) -> Result<()>;
 
-    // Exception from Tango
-    #[error("Tango error: {0}")]
-    Tango(#[from] tango_client::TangoError),
-    // Tango related other error
-    #[error("Tango error: {0}")]
-    TangoProto(&'static str),
+    fn read(&mut self, addr: usize, length: usize) -> Result<Vec<u8>> {
+        let mut vec = vec![0; length];
+        self.read_into(addr, &mut vec)?;
+        Ok(vec)
+    }
 
-    // Zapf error with annotation
-    #[error("during {1}: {0}")]
-    Wrapped(#[source] Box<Error>, &'static str),
-
-    // #[error(transparent)]
-    // Other(#[from] anyhow::Error),
+    fn get_offsets(&self) -> &[usize];
+    fn set_offset(&mut self, offset: usize);
 }
-
-pub type Result<T> = std::result::Result<T, Error>;
