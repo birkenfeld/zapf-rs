@@ -23,6 +23,7 @@
 
 pub mod ads;
 pub mod modbus;
+#[cfg(feature = "tango_client")]
 pub mod tango;
 
 use std::time::Duration;
@@ -49,6 +50,6 @@ pub trait Protocol {
         Ok(vec)
     }
 
-    fn get_offsets(&self) -> &[usize];
+    fn get_offsets() -> &'static [usize];
     fn set_offset(&mut self, offset: usize);
 }

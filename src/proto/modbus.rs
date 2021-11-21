@@ -81,7 +81,7 @@ impl ModbusProto {
 }
 
 impl Protocol for ModbusProto {
-    fn get_offsets(&self) -> &[usize] {
+    fn get_offsets() -> &'static [usize] {
         &[0, 0x6000, 0x8000]
     }
 
@@ -106,13 +106,30 @@ impl Protocol for ModbusProto {
         if self.client.is_none() {
             self.reconnect()?;
         }
-        let addr = self.convert_addr(addr)?;
+        let mut addr = self.convert_addr(addr)?;
         let client = self.client.as_mut().unwrap();
-        // TODO: log + wrap errors
-        let regs = client.read_holding_registers(addr, (data.len() / 2) as u16)?;
-        for (i, reg) in regs.into_iter().enumerate() {
-            data[2*i] = reg as u8;
-            data[2*i + 1] = (reg >> 8) as u8;
+        // TODO split requests if too large data is requested
+        let mut length = data.len();
+        let mut offset = 0;
+        while length > 0 {
+            let plen = length.min(250);
+            match client.read_holding_registers(addr, (plen / 2) as u16) {
+                Ok(regs) => {
+                    for (i, reg) in regs.into_iter().enumerate() {
+                        data[offset + 2*i] = reg as u8;
+                        data[offset + 2*i + 1] = (reg >> 8) as u8;
+                    }
+                }
+                Err(modbus::Error::Io(ioe)) => {
+                    self.disconnect();
+                    log::error!("during Modbus read: {}", ioe);
+                    return Err(Error::Wrapped(Box::new(modbus::Error::Io(ioe).into()), "read"));
+                }
+                Err(e) => return Err(e.into())
+            }
+            length -= plen;
+            offset += plen;
+            addr += (plen / 2) as u16;
         }
         Ok(())
     }
@@ -127,8 +144,13 @@ impl Protocol for ModbusProto {
         for (i, reg) in regs.iter_mut().enumerate() {
             *reg = data[2*i] as u16 | (data[2*i + 1] as u16) << 8;
         }
-        // TODO: log + wrap errors
-        client.write_multiple_registers(addr, &regs)?;
-        Ok(())
+        client.write_multiple_registers(addr, &regs)
+              .map_err(|e| if let modbus::Error::Io(ioe) = e {
+                  self.disconnect();
+                  log::error!("during Modbus write: {}", ioe);
+                  Error::Wrapped(Box::new(modbus::Error::Io(ioe).into()), "write")
+              } else {
+                  e.into()
+              })
     }
 }

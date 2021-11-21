@@ -37,23 +37,28 @@ pub enum Error {
     IO(#[from] std::io::Error),
 
     // ADS specific error code
-    #[error("ADS error: {0} ({1})")]
-    ADS(&'static str, u32),
+    #[error("ADS error: {0}")]
+    ADS(#[from] ads::Error),
 
     // Modbus specific error code
     #[error("Modbus error: {0}")]
     Modbus(#[from] modbus::Error),
 
     // Exception from Tango
+    #[cfg(feature = "tango_client")]
     #[error("Tango error: {0}")]
     Tango(#[from] tango_client::TangoError),
     // Tango related other error
+    #[cfg(feature = "tango_client")]
     #[error("Tango error: {0}")]
     TangoProto(&'static str),
 
     // Zapf error with annotation
     #[error("during {1}: {0}")]
     Wrapped(#[source] Box<Error>, &'static str),
+
+    #[error("PLC error: {0}")]
+    PLC(String),
 
     // #[error(transparent)]
     // Other(#[from] anyhow::Error),

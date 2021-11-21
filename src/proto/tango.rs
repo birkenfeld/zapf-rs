@@ -50,7 +50,7 @@ impl TangoProto {
 }
 
 impl Protocol for TangoProto {
-    fn get_offsets(&self) -> &[usize] {
+    fn get_offsets() -> &'static [usize] {
         &[0]
     }
 
